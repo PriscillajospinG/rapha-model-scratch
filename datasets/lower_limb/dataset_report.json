@@ -1,28 +1,28 @@
 {
     "total_target": 450,
     "videos_per_class": {
-        "ankle": 48,
+        "ankle": 50,
         "calf": 50,
-        "hamstring": 40,
+        "hamstring": 48,
         "heel_slide": 50,
-        "hip": 38,
-        "knee": 40,
+        "hip": 45,
+        "knee": 43,
         "leg_raise": 50,
-        "quadriceps": 49,
-        "toes": 49
+        "quadriceps": 50,
+        "toes": 50
     },
     "rejected_videos": 0,
     "videos_pending_manual_review": 0,
-    "duplicate_count": 24,
+    "duplicate_count": 10,
     "missing_videos_per_class": {
-        "ankle": 2,
+        "ankle": 0,
         "calf": 0,
-        "hamstring": 10,
+        "hamstring": 2,
         "heel_slide": 0,
-        "hip": 12,
-        "knee": 10,
+        "hip": 5,
+        "knee": 7,
         "leg_raise": 0,
-        "quadriceps": 1,
-        "toes": 1
+        "quadriceps": 0,
+        "toes": 0
     }
 }
