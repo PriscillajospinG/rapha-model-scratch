@@ -41,8 +41,7 @@ def extract_landmarks(video_path, detector):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame_rgb)
         
-        timestamp_ms = int((frame_idx / fps) * 1000)
-        results = detector.detect_for_video(mp_image, timestamp_ms)
+        results = detector.detect(mp_image)
         
         if results.pose_landmarks and len(results.pose_landmarks) > 0:
             landmarks = results.pose_landmarks[0]
@@ -106,7 +105,7 @@ def process_dataset():
     base_options = python.BaseOptions(model_asset_path='pose_landmarker_heavy.task')
     options = vision.PoseLandmarkerOptions(
         base_options=base_options,
-        running_mode=vision.RunningMode.VIDEO,
+        running_mode=vision.RunningMode.IMAGE,
         output_segmentation_masks=False)
         
     stats = {'total': 0, 'successful': 0, 'corrupted': 0}
