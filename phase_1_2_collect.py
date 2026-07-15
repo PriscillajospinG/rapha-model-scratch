@@ -115,84 +115,24 @@ def get_video_phash(filepath):
     except Exception:
         return None
 
-def analyze_video(filepath, person_model, pose_model):
+def analyze_video(filepath):
     cap = cv2.VideoCapture(filepath)
     if not cap.isOpened():
         return 'reject', 'Cannot open video file'
 
     fps = cap.get(cv2.CAP_PROP_FPS)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    
-    if fps == 0 or total_frames < 150:
-        return 'reject', 'Fewer than 150 valid frames'
-
-    duration = total_frames / fps
-    if duration < 5:
-        return 'reject', 'Duration < 5s'
-
-    sample_rate = max(1, int(fps * 0.5))
-    max_people_seen = 0
-    leg_keypoints_confidences = []
-    
-    prev_gray = None
-    motion_magnitudes = []
-    
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-            
-        frame_idx = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
-        if frame_idx % sample_rate != 0:
-            continue
-            
-        # Person Counting
-        results = person_model(frame, verbose=False, classes=[0])
-        persons_in_frame = len(results[0].boxes)
-        max_people_seen = max(max_people_seen, persons_in_frame)
-        
-        # Pose visibility (lower body indices 11-16)
-        if persons_in_frame > 0:
-            pose_results = pose_model(frame, verbose=False)
-            if len(pose_results[0].keypoints) > 0:
-                kpts = pose_results[0].keypoints.data[0]
-                if len(kpts) >= 17:
-                    lower_body_conf = kpts[11:17, 2]
-                    avg_conf = lower_body_conf.mean().item()
-                    leg_keypoints_confidences.append(avg_conf)
-                        
-        # Camera Motion
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        gray = cv2.resize(gray, (320, 240))
-        if prev_gray is not None:
-            flow = cv2.calcOpticalFlowFarneback(prev_gray, gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-            mag, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
-            motion_magnitudes.append(np.mean(mag))
-        prev_gray = gray
-
     cap.release()
     
-    if max_people_seen > 1:
-        return 'reject', 'Multiple people detected'
-    if max_people_seen == 0:
-        return 'reject', 'No person detected'
-        
-    avg_leg_vis = np.mean(leg_keypoints_confidences) if leg_keypoints_confidences else 0
-    if avg_leg_vis < 0.7:
-        return 'reject', 'Lower body visibility < 70%'
-        
-    avg_motion = np.mean(motion_magnitudes) if motion_magnitudes else 0
-    if avg_motion > 5.0:
-        return 'reject', 'Severe camera movement'
-        
-    return 'accept', 'Passed heuristics'
+    if fps == 0 or total_frames < 10:
+        return 'reject', 'Invalid video metadata'
+
+    return 'accept', 'Accepted without filtering (fast mode)'
 
 def download_and_process(target_per_class):
     setup_directories()
     
-    print("Loading YOLO models...")
-    person_model = YOLO("yolov8n.pt")
-    pose_model = YOLO("yolov8n-pose.pt")
+    print("Starting rapid download mode (filtering disabled)...")
     
     metadata_file = os.path.join(BASE_DIR, "metadata.csv")
     file_exists = os.path.exists(metadata_file)
@@ -239,7 +179,7 @@ def download_and_process(target_per_class):
                 break
                 
             needed = target_per_class - stats[class_name]['collected']
-            search_query = f"ytsearch{needed * 3}:{query}"
+            search_query = f"ytsearch{needed}:{query}"
             
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -276,7 +216,7 @@ def download_and_process(target_per_class):
                     os.remove(temp_file)
                     continue
                     
-                status, reason = analyze_video(temp_file, person_model, pose_model)
+                status, reason = analyze_video(temp_file)
                 
                 vid_id = temp_file.split('temp_')[-1].replace('.mp4', '')
                 source_url = f"https://www.youtube.com/watch?v={vid_id}"
