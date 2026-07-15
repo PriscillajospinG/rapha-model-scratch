@@ -1,2 +1,15 @@
-/Users/priscillajosping/Downloads/rapha-model-scratch/yolov8n-pose.pt
-/Users/priscillajosping/Downloads/rapha-model-scratch/yolov8n.pt
+yolov8n.pt
+yolov8n-pose.pt
+*.mp4
+temp_*.mp4
+
+# Ignore raw/rejected videos to save GitHub space
+datasets/lower_limb/raw/
+datasets/lower_limb/rejected/
+datasets/lower_limb/manual_review/
+
+# Do NOT ignore the extracted skeletons and metadata!
+!datasets/lower_limb/skeletons/
+!datasets/lower_limb/skeletons/*.npy
+!datasets/lower_limb/*.csv
+!datasets/lower_limb/*.json

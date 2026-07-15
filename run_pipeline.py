@@ -21,8 +21,10 @@ if __name__ == "__main__":
         ["phase_1_2_collect.py", "--target", "50"],
         ["phase_3_4_extract.py"],
         ["phase_5_split.py"],
-        ["phase_6_7_train.py"],
-        ["phase_8_9_export.py"]
+        # The training and export scripts are skipped locally.
+        # They will be run manually on the NVIDIA Cloud GPU.
+        # ["phase_6_7_train.py"],
+        # ["phase_8_9_export.py"]
     ]
     
     for script_args in scripts:
