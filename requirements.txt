@@ -1,0 +1,14 @@
+yt-dlp
+opencv-python<4.10
+opencv-contrib-python<4.10
+ultralytics
+imagehash
+pandas
+numpy<2
+Pillow
+torch
+torchvision
+torchaudio
+mediapipe
+scikit-learn
+matplotlib
