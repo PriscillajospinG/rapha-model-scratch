@@ -12,4 +12,4 @@ datasets/lower_limb/manual_review/
 !datasets/lower_limb/skeletons/
 !datasets/lower_limb/skeletons/*.npy
 !datasets/lower_limb/*.csv
-!datasets/lower_limb/*.json
+!datasets/lower_limb/*.jsonpose_landmarker_heavy.task
