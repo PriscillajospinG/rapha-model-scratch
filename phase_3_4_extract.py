@@ -3,7 +3,7 @@ import glob
 import json
 import cv2
 import numpy as np
-import mediapipe as mp
+import mediapipe.python.solutions.pose as mp_pose
 from scipy.interpolate import interp1d
 
 CLASSES = [
@@ -24,7 +24,6 @@ def setup_dirs():
     os.makedirs(CORRUPTED_DIR, exist_ok=True)
 
 def extract_landmarks(video_path):
-    mp_pose = mp.solutions.pose
     pose = mp_pose.Pose(
         static_image_mode=False,
         model_complexity=2,

@@ -1,0 +1,28 @@
+{
+    "total_target": 450,
+    "videos_per_class": {
+        "ankle": 19,
+        "calf": 21,
+        "hamstring": 13,
+        "heel_slide": 49,
+        "hip": 8,
+        "knee": 8,
+        "leg_raise": 39,
+        "quadriceps": 24,
+        "toes": 32
+    },
+    "rejected_videos": 0,
+    "videos_pending_manual_review": 0,
+    "duplicate_count": 213,
+    "missing_videos_per_class": {
+        "ankle": 31,
+        "calf": 29,
+        "hamstring": 37,
+        "heel_slide": 1,
+        "hip": 42,
+        "knee": 42,
+        "leg_raise": 11,
+        "quadriceps": 26,
+        "toes": 18
+    }
+}

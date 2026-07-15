@@ -179,7 +179,7 @@ def download_and_process(target_per_class):
                 break
                 
             needed = target_per_class - stats[class_name]['collected']
-            search_query = f"ytsearch{needed}:{query}"
+            search_query = f"ytsearch{needed * 2}:{query}"
             
             try:
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
