@@ -1,0 +1,32 @@
+[
+    {
+        "file": "ankle_0019.mp4",
+        "status": "corrupted",
+        "reason": "No landmarks extracted"
+    },
+    {
+        "file": "ankle_0015.mp4",
+        "status": "corrupted",
+        "reason": "No landmarks extracted"
+    },
+    {
+        "file": "calf_0039.mp4",
+        "status": "corrupted",
+        "reason": "No landmarks extracted"
+    },
+    {
+        "file": "calf_0017.mp4",
+        "status": "corrupted",
+        "reason": "No landmarks extracted"
+    },
+    {
+        "file": "heel_slide_0020.mp4",
+        "status": "corrupted",
+        "reason": "No landmarks extracted"
+    },
+    {
+        "file": "toes_0029.mp4",
+        "status": "corrupted",
+        "reason": "No landmarks extracted"
+    }
+]
