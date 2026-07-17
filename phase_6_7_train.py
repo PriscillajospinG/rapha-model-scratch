@@ -191,8 +191,8 @@ def train():
     train_dataset = SkeletonDataset(train_csv)
     test_dataset = SkeletonDataset(test_csv)
     
-    # If the dataset is too small, we use smaller batch sizes
-    batch_size = min(16, len(train_dataset) if len(train_dataset) > 0 else 1)
+    # Since we are running on an L4 GPU, we can comfortably use a larger batch size for faster training
+    batch_size = min(64, len(train_dataset) if len(train_dataset) > 0 else 1)
     
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
