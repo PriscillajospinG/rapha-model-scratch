@@ -215,7 +215,7 @@ def download_and_process(target_per_class):
             'outtmpl': os.path.join(BASE_DIR, 'temp_%(id)s.%(ext)s'),
             'noplaylist': True,
             'quiet': True,
-            'match_filter': yt_dlp.utils.match_filter_func("duration >= 5 & duration <= 120"),
+            'match_filter': yt_dlp.utils.match_filter_func("duration >= 3 & duration <= 300"),
             'extract_flat': False,
             'download_archive': os.path.join(BASE_DIR, 'download_archive.txt')
         }
