@@ -1,1 +1,7 @@
-[]
+[
+    {
+        "file": "hip_aug_0040.mp4",
+        "status": "corrupted",
+        "reason": "No landmarks extracted"
+    }
+]
