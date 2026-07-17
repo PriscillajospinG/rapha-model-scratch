@@ -9,6 +9,8 @@ datasets/lower_limb/rejected/
 datasets/lower_limb/manual_review/
 /Users/priscillajosping/Downloads/rapha-model-scratch/audit/
 audit/
+models/lower_limb
+evaluation
 
 
 # Do NOT ignore the extracted skeletons and metadata!

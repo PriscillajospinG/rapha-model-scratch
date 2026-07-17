@@ -166,8 +166,8 @@ class CTRGCN(nn.Module):
         x = self.l4(x)
         x = self.l5(x)
         
-        # Global pooling
-        x = F.avg_pool2d(x, x.size()[2:])
+        # Global pooling (ONNX safe)
+        x = x.mean(dim=(2, 3), keepdim=True)
         x = x.view(N, M, -1).mean(dim=1)
         
         return self.fc(x)
