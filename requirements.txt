@@ -12,3 +12,5 @@ torchaudio
 mediapipe
 scikit-learn
 matplotlib
+onnx
+onnxruntime

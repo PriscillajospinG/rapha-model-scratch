@@ -7,9 +7,13 @@ temp_*.mp4
 datasets/lower_limb/raw/
 datasets/lower_limb/rejected/
 datasets/lower_limb/manual_review/
+/Users/priscillajosping/Downloads/rapha-model-scratch/audit/
+audit/
+
 
 # Do NOT ignore the extracted skeletons and metadata!
 !datasets/lower_limb/skeletons/
 !datasets/lower_limb/skeletons/*.npy
 !datasets/lower_limb/*.csv
 !datasets/lower_limb/*.jsonpose_landmarker_heavy.task
+/Users/priscillajosping/Downloads/rapha-model-scratch/audit
