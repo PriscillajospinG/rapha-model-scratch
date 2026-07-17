@@ -24,10 +24,13 @@ def split_dataset():
         # Assumes format is <class_name>_<idx>.npy
         # Since class_name might have underscores (e.g. heel_slide), we must be careful.
         parts = basename.rsplit('_', 1) # Split at the last underscore
-        if len(parts) == 2 and parts[0] in CLASS_MAP:
+        if len(parts) == 2:
             class_name = parts[0]
-            dataset.append({'filename': basename, 'class_id': CLASS_MAP[class_name]})
-            labels.append(CLASS_MAP[class_name])
+            if class_name.endswith('_aug'):
+                class_name = class_name[:-4]
+            if class_name in CLASS_MAP:
+                dataset.append({'filename': basename, 'class_id': CLASS_MAP[class_name]})
+                labels.append(CLASS_MAP[class_name])
             
     if len(dataset) < 10:
         print("Not enough valid tensors to split.")
