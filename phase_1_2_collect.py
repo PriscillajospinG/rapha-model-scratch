@@ -25,50 +25,95 @@ QUERIES = {
         "ankle physiotherapy exercise",
         "ankle mobility exercise",
         "ankle ROM exercise",
-        "ankle strengthening exercise"
+        "ankle strengthening exercise",
+        "sprained ankle exercises",
+        "ankle physical therapy",
+        "ankle stability workout",
+        "how to strengthen weak ankles"
     ],
     "calf": [
         "calf rehabilitation exercise",
         "calf physiotherapy exercise",
         "calf mobility exercise",
-        "calf strengthening exercise"
+        "calf strengthening exercise",
+        "calf muscle rehab",
+        "calf raises variations",
+        "soleus stretch and strengthen",
+        "gastrocnemius exercises",
+        "lower leg workout for runners"
     ],
     "hamstring": [
         "hamstring rehabilitation exercise",
         "hamstring physiotherapy exercise",
-        "hamstring mobility exercise"
+        "hamstring mobility exercise",
+        "hamstring physical therapy",
+        "pulled hamstring exercises",
+        "hamstring curls at home",
+        "how to strengthen hamstrings",
+        "nordic hamstring curl tutorial"
     ],
     "heel_slide": [
         "heel slide rehabilitation exercise",
         "heel slide physiotherapy exercise",
-        "heel slide mobility exercise"
+        "heel slide mobility exercise",
+        "knee replacement heel slides",
+        "heel slide physical therapy",
+        "acl rehab heel slides",
+        "supine heel slides exercise"
     ],
     "hip": [
         "hip rehabilitation exercise",
         "hip physiotherapy exercise",
         "hip mobility exercise",
-        "hip strengthening exercise"
+        "hip strengthening exercise",
+        "hip flexor exercises",
+        "glute and hip workout",
+        "hip physical therapy exercises",
+        "hip replacement rehab",
+        "hip abductor strengthening"
     ],
     "knee": [
         "knee rehabilitation exercise",
         "knee physiotherapy exercise",
         "knee mobility exercise",
-        "knee strengthening exercise"
+        "knee strengthening exercise",
+        "knee pain relief workout",
+        "how to strengthen knees",
+        "knee stability exercises",
+        "knee physical therapy at home",
+        "exercises for bad knees",
+        "vmo strengthening exercises",
+        "acl recovery exercises",
+        "patellar tracking exercises"
     ],
     "leg_raise": [
         "leg raise rehabilitation exercise",
         "leg raise physiotherapy exercise",
-        "straight leg raise exercise"
+        "straight leg raise exercise",
+        "supine straight leg raise",
+        "side lying leg raise",
+        "slr physical therapy",
+        "hip flexor straight leg raise"
     ],
     "quadriceps": [
         "quadriceps rehabilitation exercise",
         "quadriceps physiotherapy exercise",
-        "quadriceps strengthening exercise"
+        "quadriceps strengthening exercise",
+        "quad exercises at home",
+        "how to build quad muscles",
+        "quadriceps physical therapy",
+        "isometric quad exercises",
+        "terminal knee extension tke"
     ],
     "toes": [
         "toes rehabilitation exercise",
         "toes physiotherapy exercise",
-        "toe strengthening exercise"
+        "toe strengthening exercise",
+        "toe yoga exercises",
+        "plantar fasciitis toe stretches",
+        "foot and toe mobility",
+        "intrinsic foot muscle exercises",
+        "toe curl exercises"
     ]
 }
 
@@ -137,17 +182,17 @@ def download_and_process(target_per_class):
     metadata_file = os.path.join(BASE_DIR, "metadata.csv")
     file_exists = os.path.exists(metadata_file)
     
-    seen_hashes = set()
-    seen_phashes = set()
-    
+    hash_registry = set()
+    url_registry = set()
     if file_exists:
         with open(metadata_file, 'r', encoding='utf-8') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                pass
+                if 'hash' in row: hash_registry.add(row['hash'])
+                if 'source_url' in row: url_registry.add(row['source_url'])
                 
     csv_file = open(metadata_file, 'a', newline='', encoding='utf-8')
-    fieldnames = ['filename', 'class', 'duration_seconds', 'fps', 'width', 'height', 'source_url', 'download_date', 'status', 'reason']
+    fieldnames = ['filename', 'class', 'duration_seconds', 'fps', 'width', 'height', 'source_url', 'hash', 'download_date', 'status', 'reason']
     writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
     if not file_exists:
         writer.writeheader()
@@ -172,6 +217,7 @@ def download_and_process(target_per_class):
             'quiet': True,
             'match_filter': yt_dlp.utils.match_filter_func("duration >= 5 & duration <= 120"),
             'extract_flat': False,
+            'download_archive': os.path.join(BASE_DIR, 'download_archive.txt')
         }
         
         for query in queries:
@@ -194,16 +240,21 @@ def download_and_process(target_per_class):
                 if stats[class_name]['collected'] >= target_per_class:
                     os.remove(temp_file)
                     continue
+
+                vid_id = temp_file.split('temp_')[-1].replace('.mp4', '')
+                source_url = f"https://www.youtube.com/watch?v={vid_id}"
+                if source_url in url_registry:
+                    os.remove(temp_file)
+                    continue
                     
                 fhash = get_file_hash(temp_file)
                 phash = get_video_phash(temp_file)
                 
-                if (fhash and fhash in seen_hashes) or (phash and phash in seen_phashes):
+                if (fhash and fhash in hash_registry) or (phash and phash in hash_registry):
                     os.remove(temp_file)
                     continue
                     
-                if fhash: seen_hashes.add(fhash)
-                if phash: seen_phashes.add(phash)
+                if fhash: hash_registry.add(fhash)
                 
                 cap = cv2.VideoCapture(temp_file)
                 if cap.isOpened():
@@ -218,9 +269,6 @@ def download_and_process(target_per_class):
                     
                 status, reason = analyze_video(temp_file)
                 
-                vid_id = temp_file.split('temp_')[-1].replace('.mp4', '')
-                source_url = f"https://www.youtube.com/watch?v={vid_id}"
-                
                 if status == 'accept':
                     stats[class_name]['collected'] += 1
                     stats[class_name]['new_collected'] += 1
@@ -228,6 +276,7 @@ def download_and_process(target_per_class):
                     final_name = f"{class_name}_{idx:04d}.mp4"
                     dest_path = os.path.join(RAW_DIR, class_name, final_name)
                     shutil.move(temp_file, dest_path)
+                    url_registry.add(source_url)
                 elif status == 'review':
                     stats[class_name]['review'] += 1
                     idx = stats[class_name]['review']
@@ -249,6 +298,7 @@ def download_and_process(target_per_class):
                     'width': width,
                     'height': height,
                     'source_url': source_url,
+                    'hash': fhash,
                     'download_date': datetime.now().isoformat(),
                     'status': status,
                     'reason': reason
@@ -265,7 +315,7 @@ def download_and_process(target_per_class):
         'videos_per_class': {c: stats[c]['collected'] for c in CLASSES},
         'rejected_videos': sum(stats[c]['rejected'] for c in CLASSES),
         'videos_pending_manual_review': sum(stats[c]['review'] for c in CLASSES),
-        'duplicate_count': len(seen_hashes),
+        'duplicate_count': len(hash_registry),
         'missing_videos_per_class': {c: target_per_class - stats[c]['collected'] for c in CLASSES}
     }
     
