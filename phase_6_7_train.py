@@ -50,7 +50,18 @@ class SkeletonDataset(Dataset):
         with open(csv_file, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
-                self.data.append(row)
+                # Sequence Chunking: Slide a 100-frame window over the 300 frames
+                if self.transform:
+                    # 5 chunks per video for training (0, 50, 100, 150, 200)
+                    for start_frame in [0, 50, 100, 150, 200]:
+                        chunk_row = row.copy()
+                        chunk_row['start_frame'] = start_frame
+                        self.data.append(chunk_row)
+                else:
+                    # 1 center chunk for testing (from 100 to 200)
+                    chunk_row = row.copy()
+                    chunk_row['start_frame'] = 100
+                    self.data.append(chunk_row)
                 
     def __len__(self):
         return len(self.data)
@@ -58,10 +69,12 @@ class SkeletonDataset(Dataset):
     def __getitem__(self, idx):
         filename = self.data[idx]['filename']
         class_id = int(self.data[idx]['class_id'])
+        start_frame = self.data[idx]['start_frame']
         tensor_path = os.path.join(SKELETON_DIR, filename)
         
-        # Load (4, 300, 10, 1)
+        # Load (4, 300, 10, 1) -> Crop to (4, 100, 10, 1)
         x = np.load(tensor_path).astype(np.float32)
+        x = x[:, start_frame:start_frame+100, :, :]
         
         # Apply Data Augmentation
         if self.transform:
@@ -74,13 +87,13 @@ class SkeletonDataset(Dataset):
             x[:3] += shift
             
             # 3. Temporal Masking (randomly drop 10% of frames to zeros)
-            mask_indices = np.random.choice(300, size=int(300 * 0.1), replace=False)
+            mask_indices = np.random.choice(100, size=int(100 * 0.1), replace=False)
             x[:, mask_indices, :, :] = 0.0
 
             # 4. Temporal Speed Augmentation (scale speed by 0.8x to 1.2x)
             speed_factor = np.random.uniform(0.8, 1.2)
-            indices = np.linspace(0, 299, 300) * speed_factor
-            indices = np.clip(indices, 0, 299).astype(int)
+            indices = np.linspace(0, 99, 100) * speed_factor
+            indices = np.clip(indices, 0, 99).astype(int)
             x = x[:, indices, :, :]
 
         x = torch.from_numpy(x)

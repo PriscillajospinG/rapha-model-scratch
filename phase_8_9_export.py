@@ -40,8 +40,8 @@ def export_and_report():
     print(f"✅  PTH file: {model_path}  ({pth_size:.2f} MB)")
 
     # ── 2. ONNX Export ─────────────────────────────────────────────────
-    # Input shape: (N, C, T, V, M) = (1, 4, 300, 10, 1)
-    dummy_input = torch.randn(1, 4, 300, 10, 1)
+    # Input shape: (N, C, T, V, M) = (1, 4, 100, 10, 1)
+    dummy_input = torch.randn(1, 4, 100, 10, 1)
     onnx_path   = os.path.join(EXPORT_DIR, "best_model.onnx")
 
     print("⏳  Exporting to ONNX …")
