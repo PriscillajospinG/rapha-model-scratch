@@ -23,12 +23,30 @@ def setup_dirs():
     os.makedirs(MODEL_DIR, exist_ok=True)
     os.makedirs(EVAL_DIR, exist_ok=True)
 
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=1, gamma=2, reduction='mean'):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        return focal_loss
+
 # ----------------------------------------------------
 # Dataset
 # ----------------------------------------------------
 class SkeletonDataset(Dataset):
-    def __init__(self, csv_file):
+    def __init__(self, csv_file, transform=False):
         self.data = []
+        self.transform = transform
         with open(csv_file, 'r') as f:
             reader = csv.DictReader(f)
             for row in reader:
@@ -44,6 +62,27 @@ class SkeletonDataset(Dataset):
         
         # Load (4, 300, 10, 1)
         x = np.load(tensor_path).astype(np.float32)
+        
+        # Apply Data Augmentation
+        if self.transform:
+            # 1. Spatial Jittering (add random noise to X, Y, Z coordinates)
+            jitter = np.random.normal(loc=0, scale=0.01, size=x[:3].shape).astype(np.float32)
+            x[:3] += jitter
+            
+            # 2. Random Global Translation
+            shift = np.random.uniform(low=-0.05, high=0.05, size=(3, 1, 1, 1)).astype(np.float32)
+            x[:3] += shift
+            
+            # 3. Temporal Masking (randomly drop 10% of frames to zeros)
+            mask_indices = np.random.choice(300, size=int(300 * 0.1), replace=False)
+            x[:, mask_indices, :, :] = 0.0
+
+            # 4. Temporal Speed Augmentation (scale speed by 0.8x to 1.2x)
+            speed_factor = np.random.uniform(0.8, 1.2)
+            indices = np.linspace(0, 299, 300) * speed_factor
+            indices = np.clip(indices, 0, 299).astype(int)
+            x = x[:, indices, :, :]
+
         x = torch.from_numpy(x)
         return x, class_id
 
@@ -148,8 +187,11 @@ class CTRGCN(nn.Module):
         self.l3 = CTRGCNBlock(64, 128, A, stride=2)
         self.l4 = CTRGCNBlock(128, 128, A, stride=1)
         self.l5 = CTRGCNBlock(128, 256, A, stride=2)
+        self.l6 = CTRGCNBlock(256, 256, A, stride=1)
+        self.l7 = CTRGCNBlock(256, 512, A, stride=2)
         
-        self.fc = nn.Linear(256, num_class)
+        self.dropout = nn.Dropout(p=0.5)
+        self.fc = nn.Linear(512, num_class)
         
     def forward(self, x):
         N, C, T, V, M = x.size()
@@ -165,11 +207,14 @@ class CTRGCN(nn.Module):
         x = self.l3(x)
         x = self.l4(x)
         x = self.l5(x)
+        x = self.l6(x)
+        x = self.l7(x)
         
         # Global pooling (ONNX safe)
         x = x.mean(dim=(2, 3), keepdim=True)
         x = x.view(N, M, -1).mean(dim=1)
         
+        x = self.dropout(x)
         return self.fc(x)
 
 # ----------------------------------------------------
@@ -188,8 +233,8 @@ def train():
         print("Dataset splits not found. Please run phase 5.")
         return
         
-    train_dataset = SkeletonDataset(train_csv)
-    test_dataset = SkeletonDataset(test_csv)
+    train_dataset = SkeletonDataset(train_csv, transform=True)
+    test_dataset = SkeletonDataset(test_csv, transform=False)
     
     # Since we are running on an L4 GPU, we can comfortably use a larger batch size for faster training
     batch_size = min(64, len(train_dataset) if len(train_dataset) > 0 else 1)
@@ -199,8 +244,8 @@ def train():
     
     model = CTRGCN(num_class=len(CLASSES)).to(device)
     
-    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+    criterion = FocalLoss(gamma=2.0)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=0.001, weight_decay=5e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
     
     best_acc = 0.0
@@ -216,9 +261,21 @@ def train():
         total_loss = 0
         for x, y in train_loader:
             x, y = x.to(device), y.to(device)
+            
+            # MixUp Augmentation
+            if np.random.rand() < 0.5:
+                lam = np.random.beta(1.0, 1.0)
+                index = torch.randperm(x.size(0)).to(device)
+                x = lam * x + (1 - lam) * x[index, :]
+                y_a, y_b = y, y[index]
+            else:
+                lam = 1.0
+                y_a, y_b = y, y
+                
             optimizer.zero_grad()
             out = model(x)
-            loss = criterion(out, y)
+            
+            loss = lam * criterion(out, y_a) + (1 - lam) * criterion(out, y_b)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
