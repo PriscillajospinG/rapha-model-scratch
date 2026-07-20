@@ -2,6 +2,10 @@ yolov8n.pt
 yolov8n-pose.pt
 *.mp4
 temp_*.mp4
+models/
+evaluations/lower_limb/
+evaluation
+evaluation/lower_limb
 
 # Ignore raw/rejected videos to save GitHub space
 datasets/lower_limb/raw/
