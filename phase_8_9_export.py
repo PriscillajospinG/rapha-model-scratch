@@ -203,7 +203,7 @@ def export_and_report():
 4. **Check confusion matrix** — identify which class pairs confuse the model most
 """
 
-    with open("training_report.md", "w") as f:
+    with open("training_report.md", "w", encoding="utf-8") as f:
         f.write(report_md)
     print("✅  Training report saved: training_report.md")
 

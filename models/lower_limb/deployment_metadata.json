@@ -1,0 +1,71 @@
+{
+    "model_name": "lower_limb_ctrgcn",
+    "architecture": "CTR-GCN (Channel-wise Topology Refinement Graph Convolutional Network)",
+    "num_classes": 9,
+    "class_mapping": {
+        "0": "ankle",
+        "1": "calf",
+        "2": "hamstring",
+        "3": "heel_slide",
+        "4": "hip",
+        "5": "knee",
+        "6": "leg_raise",
+        "7": "quadriceps",
+        "8": "toes"
+    },
+    "input": {
+        "name": "skeleton_input",
+        "shape": [
+            1,
+            4,
+            300,
+            10,
+            1
+        ],
+        "layout": "(N, C, T, V, M) = (batch, channels, frames, joints, persons)",
+        "channels": {
+            "0": "x coordinate",
+            "1": "y coordinate",
+            "2": "z coordinate",
+            "3": "visibility"
+        }
+    },
+    "output": {
+        "name": "class_logits",
+        "shape": [
+            1,
+            9
+        ],
+        "note": "Apply softmax to get probabilities"
+    },
+    "joint_mapping": {
+        "0": "Left Hip (MP landmark 23)",
+        "1": "Right Hip (MP landmark 24)",
+        "2": "Left Knee (MP landmark 25)",
+        "3": "Right Knee (MP landmark 26)",
+        "4": "Left Ankle (MP landmark 27)",
+        "5": "Right Ankle (MP landmark 28)",
+        "6": "Left Heel (MP landmark 29)",
+        "7": "Right Heel (MP landmark 30)",
+        "8": "Left Foot Index (MP landmark 31)",
+        "9": "Right Foot Index (MP landmark 32)"
+    },
+    "preprocessing": "MediaPipe PoseLandmarker (heavy model) \u2192 10 lower-limb joints \u2192 interpolated to 300 frames",
+    "training": {
+        "dataset": "450 balanced videos (50 per class, 9 classes)",
+        "train_samples": 360,
+        "test_samples": 90,
+        "optimizer": "AdamW (lr=0.001, weight_decay=1e-4)",
+        "scheduler": "CosineAnnealingLR (T_max=200)",
+        "loss": "CrossEntropyLoss (label_smoothing=0.1)"
+    },
+    "performance": {
+        "best_accuracy": 0.6777777777777778,
+        "macro_f1": 0.6800274795126053,
+        "top3_accuracy": 0.8222222222222222
+    },
+    "files": {
+        "pth": "best_model.pth",
+        "onnx": "best_model.onnx"
+    }
+}
