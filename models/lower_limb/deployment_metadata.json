@@ -17,17 +17,20 @@
         "name": "skeleton_input",
         "shape": [
             1,
-            4,
+            7,
             300,
             10,
             1
         ],
         "layout": "(N, C, T, V, M) = (batch, channels, frames, joints, persons)",
         "channels": {
-            "0": "x coordinate",
-            "1": "y coordinate",
-            "2": "z coordinate",
-            "3": "visibility"
+            "0": "x coordinate (root-centered on mid-hip, scale-normalized by hip-to-ankle body length)",
+            "1": "y coordinate (root-centered, scale-normalized)",
+            "2": "z coordinate (root-centered, scale-normalized)",
+            "3": "visibility",
+            "4": "x velocity (frame-to-frame delta of normalized x)",
+            "5": "y velocity (frame-to-frame delta of normalized y)",
+            "6": "z velocity (frame-to-frame delta of normalized z)"
         }
     },
     "output": {
@@ -50,19 +53,22 @@
         "8": "Left Foot Index (MP landmark 31)",
         "9": "Right Foot Index (MP landmark 32)"
     },
-    "preprocessing": "MediaPipe PoseLandmarker (heavy model) \u2192 10 lower-limb joints \u2192 interpolated to 300 frames",
+    "preprocessing": "MediaPipe PoseLandmarker (heavy model) \u2192 10 lower-limb joints \u2192 interpolated to 300 frames \u2192 root-centered on mid-hip, scale-normalized by hip-to-ankle body length, velocity channels appended",
     "training": {
-        "dataset": "450 balanced videos (50 per class, 9 classes)",
-        "train_samples": 360,
-        "test_samples": 90,
+        "dataset": "450 balanced videos (50 per class, 9 classes), group-aware split (a video and its augmented derivatives never cross a split boundary)",
+        "train_samples": 279,
+        "val_samples": 75,
+        "test_samples": 96,
         "optimizer": "AdamW (lr=0.001, weight_decay=1e-4)",
         "scheduler": "CosineAnnealingLR (T_max=200)",
-        "loss": "CrossEntropyLoss (label_smoothing=0.1)"
+        "loss": "CrossEntropyLoss (label_smoothing=0.1)",
+        "regularization": "Dropout(p=0.3) before classifier head; online skeleton augmentation (rotation, scale jitter, joint jitter, temporal crop) on train split only"
     },
     "performance": {
-        "best_accuracy": 0.6777777777777778,
-        "macro_f1": 0.6800274795126053,
-        "top3_accuracy": 0.8222222222222222
+        "best_accuracy": 0.4375,
+        "best_val_accuracy": 0.5733333333333334,
+        "macro_f1": 0.4396639747516941,
+        "top3_accuracy": 0.6979166666666666
     },
     "files": {
         "pth": "best_model.pth",

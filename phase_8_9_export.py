@@ -30,7 +30,7 @@ def export_and_report():
 
     # ── Load model on CPU for portable export ──────────────────────────
     device = torch.device("cpu")
-    model  = CTRGCN(num_class=len(CLASSES)).to(device)
+    model  = CTRGCN(num_class=len(CLASSES), in_channels=7).to(device)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()
     print(f"✅  Loaded weights from {model_path}")
@@ -40,8 +40,11 @@ def export_and_report():
     print(f"✅  PTH file: {model_path}  ({pth_size:.2f} MB)")
 
     # ── 2. ONNX Export ─────────────────────────────────────────────────
-    # Input shape: (N, C, T, V, M) = (1, 4, 300, 10, 1)
-    dummy_input = torch.randn(1, 4, 300, 10, 1)
+    # Input shape: (N, C, T, V, M) = (1, 7, 300, 10, 1)
+    # Channels 0-3 are root-centered/scale-normalized [x, y, z, visibility],
+    # channels 4-6 are frame-to-frame velocity [vx, vy, vz] of the position
+    # channels. See normalize_position()/add_velocity() in phase_6_7_train.py.
+    dummy_input = torch.randn(1, 7, 300, 10, 1)
     onnx_path   = os.path.join(EXPORT_DIR, "best_model.onnx")
 
     print("⏳  Exporting to ONNX …")
@@ -107,13 +110,16 @@ def export_and_report():
         "class_mapping": {str(i): c for i, c in enumerate(CLASSES)},
         "input": {
             "name": "skeleton_input",
-            "shape": [1, 4, 300, 10, 1],
+            "shape": [1, 7, 300, 10, 1],
             "layout": "(N, C, T, V, M) = (batch, channels, frames, joints, persons)",
             "channels": {
-                "0": "x coordinate",
-                "1": "y coordinate",
-                "2": "z coordinate",
-                "3": "visibility"
+                "0": "x coordinate (root-centered on mid-hip, scale-normalized by hip-to-ankle body length)",
+                "1": "y coordinate (root-centered, scale-normalized)",
+                "2": "z coordinate (root-centered, scale-normalized)",
+                "3": "visibility",
+                "4": "x velocity (frame-to-frame delta of normalized x)",
+                "5": "y velocity (frame-to-frame delta of normalized y)",
+                "6": "z velocity (frame-to-frame delta of normalized z)"
             }
         },
         "output": {
@@ -133,17 +139,20 @@ def export_and_report():
             "8": "Left Foot Index (MP landmark 31)",
             "9": "Right Foot Index (MP landmark 32)"
         },
-        "preprocessing": "MediaPipe PoseLandmarker (heavy model) → 10 lower-limb joints → interpolated to 300 frames",
+        "preprocessing": "MediaPipe PoseLandmarker (heavy model) → 10 lower-limb joints → interpolated to 300 frames → root-centered on mid-hip, scale-normalized by hip-to-ankle body length, velocity channels appended",
         "training": {
-            "dataset": "450 balanced videos (50 per class, 9 classes)",
-            "train_samples": 360,
-            "test_samples": 90,
+            "dataset": "450 balanced videos (50 per class, 9 classes), group-aware split (a video and its augmented derivatives never cross a split boundary)",
+            "train_samples": sum(1 for _ in open(os.path.join(BASE_DIR, "train_labels.csv"))) - 1,
+            "val_samples": sum(1 for _ in open(os.path.join(BASE_DIR, "val_labels.csv"))) - 1,
+            "test_samples": sum(1 for _ in open(os.path.join(BASE_DIR, "test_labels.csv"))) - 1,
             "optimizer": "AdamW (lr=0.001, weight_decay=1e-4)",
             "scheduler": "CosineAnnealingLR (T_max=200)",
             "loss": "CrossEntropyLoss (label_smoothing=0.1)",
+            "regularization": "Dropout(p=0.3) before classifier head; online skeleton augmentation (rotation, scale jitter, joint jitter, temporal crop) on train split only",
         },
         "performance": {
             "best_accuracy": metrics.get("best_accuracy", "N/A"),
+            "best_val_accuracy": metrics.get("best_val_accuracy", "N/A"),
             "macro_f1":      metrics.get("macro_f1", "N/A"),
             "top3_accuracy": metrics.get("top_3_accuracy", "N/A"),
         },
@@ -159,11 +168,13 @@ def export_and_report():
 
     # ── 6. Final training report markdown ─────────────────────────────
     num_train = sum(1 for _ in open(os.path.join(BASE_DIR,"train_labels.csv"))) - 1
+    num_val   = sum(1 for _ in open(os.path.join(BASE_DIR,"val_labels.csv")))   - 1
     num_test  = sum(1 for _ in open(os.path.join(BASE_DIR,"test_labels.csv")))  - 1
 
-    acc    = metrics.get("best_accuracy", 0)
-    f1     = metrics.get("macro_f1", 0)
-    top3   = metrics.get("top_3_accuracy", 0)
+    acc      = metrics.get("best_accuracy", 0)
+    val_acc  = metrics.get("best_val_accuracy", 0)
+    f1       = metrics.get("macro_f1", 0)
+    top3     = metrics.get("top_3_accuracy", 0)
 
     goals_met = acc >= 0.80 and f1 >= 0.75
     status_line = "**Status: Target metrics achieved ✅**" if goals_met else \
@@ -175,15 +186,21 @@ def export_and_report():
 | Split | Samples |
 |-------|---------|
 | Train | {num_train} |
+| Val   | {num_val}   |
 | Test  | {num_test}  |
-| Total | {num_train + num_test} |
+| Total | {num_train + num_val + num_test} |
+
+Split is group-aware: a real video and any augmented clips derived from it
+always land in the same split, so the test set contains no near-duplicates
+of training data.
 
 ## Model Performance
 | Metric | Value |
 |--------|-------|
-| Best Top-1 Accuracy | {acc:.4f} |
-| Macro F1 | {f1:.4f} |
-| Top-3 Accuracy | {top3:.4f} |
+| Best Top-1 Accuracy (test, untouched during training) | {acc:.4f} |
+| Best Val Accuracy (used for checkpoint selection) | {val_acc:.4f} |
+| Macro F1 (test) | {f1:.4f} |
+| Top-3 Accuracy (test) | {top3:.4f} |
 
 {status_line}
 
@@ -197,10 +214,10 @@ def export_and_report():
     if not goals_met:
         report_md += """
 ## Recommendations for Improvement
-1. **Increase dataset size** — collect more real videos per class
-2. **Add spatial augmentation** — slight joint jittering during training
-3. **Tune hyperparameters** — try lr=0.0005, larger model depth
-4. **Check confusion matrix** — identify which class pairs confuse the model most
+1. **Increase dataset size** — collect more real videos per class, especially for weaker classes (toes, knee, leg_raise, heel_slide)
+2. **Tune hyperparameters** — try lr=0.0005, or a shallower/wider model given the small dataset
+3. **Check confusion matrix** — identify which class pairs confuse the model most (previously knee/quadriceps, hip/leg_raise)
+4. **Review low-visibility joints** — MediaPipe visibility scores for toe/heel landmarks are often lower quality on short clips; consider filtering or flagging low-confidence frames
 """
 
     with open("training_report.md", "w", encoding="utf-8") as f:
