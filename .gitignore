@@ -1,23 +1,36 @@
+# OS cruft
+.DS_Store
+__pycache__/
+*.pyc
+
+# Pretrained third-party model weights (downloadable, not project source)
 yolov8n.pt
 yolov8n-pose.pt
-*.mp4
-temp_*.mp4
-models/
-evaluations/lower_limb/
-evaluation
-evaluation/lower_limb
+pose_landmarker_heavy.task
+pose_landmarker_lite.task
+pose_landmarker_full.task
 
-# Ignore raw/rejected videos to save GitHub space
+# Trained model artifacts -- regenerate via the training pipeline
+models/
+
+# Evaluation outputs -- regenerate via the training pipeline
+evaluation/
+
+# Raw video is never retained by design past review/extraction.
+# It should never end up in git history.
+*.mp4
+temp_*
 datasets/lower_limb/raw/
+datasets/lower_limb/pending_review/
 datasets/lower_limb/rejected/
 datasets/lower_limb/manual_review/
-/Users/priscillajosping/Downloads/rapha-model-scratch/audit/
-audit/
 
+# Encryption key for skeleton tensors -- NEVER commit this
+.keys/
 
-# Do NOT ignore the extracted skeletons and metadata!
-!datasets/lower_limb/skeletons/
-!datasets/lower_limb/skeletons/*.npy
-!datasets/lower_limb/*.csv
-!datasets/lower_limb/*.jsonpose_landmarker_heavy.task
-/Users/priscillajosping/Downloads/rapha-model-scratch/audit
+# Optional local capture output from realtime_infer.py --capture-dir
+captures/
+
+# Do track: datasets/lower_limb/skeletons/*.npy.enc, *.csv, review_log.csv,
+# metadata.csv, and *.json reports -- these are the sanitized, encrypted,
+# human-reviewed artifacts this pipeline is built to produce.
