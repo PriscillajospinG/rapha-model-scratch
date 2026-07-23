@@ -8,12 +8,12 @@ not plaintext-readable if the disk/backup is copied off this machine, but it
 is NOT a substitute for real key management. Before handling real patient
 data in production, replace SKELETON_KEY_PATH with a managed KMS (AWS KMS,
 GCP KMS, Azure Key Vault, HashiCorp Vault) and per-tenant/per-record key
-rotation. Do not commit the key file to git (it's gitignored below).
+rotation. Do not commit the key file to git (it's gitignored).
 """
 import os
+import io
 from cryptography.fernet import Fernet
 import numpy as np
-import io
 
 SKELETON_KEY_PATH = os.environ.get("SKELETON_KEY_PATH", os.path.join(".keys", "skeleton.key"))
 
@@ -34,7 +34,8 @@ def generate_key(path=SKELETON_KEY_PATH):
 def load_key(path=SKELETON_KEY_PATH):
     if not os.path.exists(path):
         raise FileNotFoundError(
-            f"No encryption key found at {path}. Run `python crypto_utils.py init` first."
+            f"No encryption key found at {path}. Run `rehab-keygen` (or "
+            f"`python -m rehab_pipeline.common.crypto`) first."
         )
     with open(path, "rb") as f:
         return f.read()
@@ -60,9 +61,9 @@ def load_encrypted_npy(path):
     return np.load(io.BytesIO(plaintext))
 
 
+def main():
+    generate_key()
+
+
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "init":
-        generate_key()
-    else:
-        print("Usage: python crypto_utils.py init")
+    main()

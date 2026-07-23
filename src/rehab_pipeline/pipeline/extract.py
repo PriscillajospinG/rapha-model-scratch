@@ -2,14 +2,14 @@
 Phase 3 & 4: Extraction.
 
 Usage:
-    python phase_3_4_extract.py --domain lower_limb
-    python phase_3_4_extract.py --domain upper_body
+    rehab-extract --domain lower_limb
+    rehab-extract --domain upper_body
 
 Reads ONLY from datasets/<domain>/raw/<class>/ -- i.e. only videos a human
-already confirmed via review_app.py. For each video:
+already confirmed via `rehab-review`. For each video:
   1. Run MediaPipe PoseLandmarker to get this domain's joints per frame.
   2. Interpolate gaps, resample to a fixed frame count, normalize
-     (center/scale per the domain's config) via pipeline_common.
+     (center/scale per the domain's config) via common/preprocessing.py.
   3. Quality-gate on visibility -- clips where the relevant body region was
      barely visible get dropped instead of silently entering training.
   4. Encrypt the resulting tensor and write it to skeletons/ as .npy.enc.
@@ -27,9 +27,9 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-from domains import get_domain, DOMAIN_NAMES
-from pipeline_common import build_tensor, validate_tensor, MIN_VISIBLE_FRAME_FRACTION
-from crypto_utils import save_encrypted_npy
+from ..domains import get_domain, DOMAIN_NAMES
+from ..common.preprocessing import build_tensor, validate_tensor, MIN_VISIBLE_FRAME_FRACTION
+from ..common.crypto import save_encrypted_npy
 
 POSE_MODEL_ASSET = "pose_landmarker_heavy.task"
 
@@ -138,8 +138,12 @@ def process_dataset(domain):
     print(f"Corrupted: {stats['corrupted']}")
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Phase 3 & 4: Skeleton extraction")
     parser.add_argument("--domain", required=True, choices=DOMAIN_NAMES)
     args = parser.parse_args()
     process_dataset(get_domain(args.domain))
+
+
+if __name__ == "__main__":
+    main()

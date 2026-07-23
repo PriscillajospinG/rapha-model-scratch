@@ -2,19 +2,19 @@
 Phase 1 & 2: Collection.
 
 Usage:
-    python phase_1_2_collect.py --domain lower_limb --target 50
-    python phase_1_2_collect.py --domain upper_body --target 50
+    rehab-collect --domain lower_limb --target 50
+    rehab-collect --domain upper_body --target 50
 
 This does NOT auto-accept videos into the training set. Every downloaded
 candidate is:
   1. Deduplicated (file hash + 3-frame perceptual hash).
-  2. Screened by an automated heuristic (quality_filter.py) that rejects
-     obvious junk (no person / multiple people) and flags borderline clips,
-     checking the body-region keypoints relevant to this domain.
+  2. Screened by an automated heuristic (common/quality_filter.py) that
+     rejects obvious junk (no person / multiple people) and flags borderline
+     clips, checking the body-region keypoints relevant to this domain.
   3. Anything not auto-rejected is moved to datasets/<domain>/pending_review/
      for a HUMAN to confirm or correct the label before it ever reaches the
-     training set. Run `python review_app.py --domain <domain>` to work
-     through the queue.
+     training set. Run `rehab-review --domain <domain>` to work through the
+     queue.
 
 The label attached at download time is only a *hypothesis* based on the
 search query used to find the video -- it is not trustworthy on its own.
@@ -33,8 +33,8 @@ import yt_dlp
 from PIL import Image
 import imagehash
 
-from domains import get_domain, DOMAIN_NAMES
-from quality_filter import heuristic_screen
+from ..domains import get_domain, DOMAIN_NAMES
+from ..common.quality_filter import heuristic_screen
 
 
 def get_file_hash(filepath):
@@ -187,7 +187,7 @@ def download_and_process(domain, target_per_class, run_heuristic_screen=True):
                     continue
 
                 # candidate or low_confidence -> goes to a human, video is kept
-                # only until reviewed (see review_app.py for deletion/promotion).
+                # only until reviewed (see pipeline/review_app.py for deletion/promotion).
                 stats[class_name]['pending'] += 1
                 stats[class_name]['new'] += 1
                 idx = stats[class_name]['pending']
@@ -216,7 +216,7 @@ def download_and_process(domain, target_per_class, run_heuristic_screen=True):
         'pending_review_per_class': {c: stats[c]['pending'] for c in domain.classes},
         'newly_downloaded': sum(stats[c]['new'] for c in domain.classes),
         'auto_rejected': sum(stats[c]['auto_rejected'] for c in domain.classes),
-        'note': 'Nothing here is in the training set yet. Run review_app.py to confirm labels.',
+        'note': 'Nothing here is in the training set yet. Run rehab-review to confirm labels.',
     }
     with open(os.path.join(base_dir, 'dataset_report.json'), 'w') as f:
         json.dump(report, f, indent=4)
@@ -224,10 +224,10 @@ def download_and_process(domain, target_per_class, run_heuristic_screen=True):
     print(f"\n--- Phase 1 & 2 Completed ({domain.name}) ---")
     print(f"New candidates awaiting human review: {sum(stats[c]['new'] for c in domain.classes)}")
     print(f"Auto-rejected by heuristic screen: {sum(stats[c]['auto_rejected'] for c in domain.classes)}")
-    print(f"Run `python review_app.py --domain {domain.name}` to confirm labels before training.")
+    print(f"Run `rehab-review --domain {domain.name}` to confirm labels before training.")
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Phase 1 & 2: Dataset Collection")
     parser.add_argument("--domain", required=True, choices=DOMAIN_NAMES)
     parser.add_argument("--target", type=int, default=150,
@@ -237,3 +237,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     download_and_process(get_domain(args.domain), args.target,
                           run_heuristic_screen=not args.no_heuristic_screen)
+
+
+if __name__ == "__main__":
+    main()

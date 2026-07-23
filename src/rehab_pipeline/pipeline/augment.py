@@ -3,15 +3,15 @@ Fills each class up to --target real+augmented videos by generating
 hflip/brightness variants of existing raw/<class>/ videos.
 
 Usage:
-    python augment_fill.py --domain lower_limb --target 50
-    python augment_fill.py --domain upper_body --target 50
+    rehab-augment --domain lower_limb --target 50
+    rehab-augment --domain upper_body --target 50
 
 Augmented clips are derived from an already human-approved source video (it
-only lives in raw/<class>/ after review_app.py confirmed it), so they don't
+only lives in raw/<class>/ after `rehab-review` confirmed it), so they don't
 re-enter the review queue -- they inherit the source's confirmed label. They
-still go through phase_3_4_extract.py for skeleton extraction like
-everything else in raw/, and phase_5_split.py groups them with their source
-video so they can never leak across train/val/test.
+still go through `rehab-extract` for skeleton extraction like everything
+else in raw/, and `rehab-split` groups them with their source video so they
+can never leak across train/val/test.
 """
 import os
 import glob
@@ -22,7 +22,7 @@ import argparse
 from datetime import datetime
 import cv2
 
-from domains import get_domain, DOMAIN_NAMES
+from ..domains import get_domain, DOMAIN_NAMES
 
 
 def get_file_hash(filepath):
@@ -125,9 +125,13 @@ def fill(domain, target):
     print(f"Augmentation complete ({domain.name}).")
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--domain", required=True, choices=DOMAIN_NAMES)
     parser.add_argument("--target", type=int, default=50)
     args = parser.parse_args()
     fill(get_domain(args.domain), args.target)
+
+
+if __name__ == "__main__":
+    main()

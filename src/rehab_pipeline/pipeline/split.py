@@ -2,8 +2,8 @@
 Phase 5: Split.
 
 Usage:
-    python phase_5_split.py --domain lower_limb
-    python phase_5_split.py --domain upper_body
+    rehab-split --domain lower_limb
+    rehab-split --domain upper_body
 
 Splits at the SOURCE-VIDEO level, not the file level. An augmented clip
 (hflip/brightness) is a near-duplicate of the video it was derived from --
@@ -24,7 +24,7 @@ from collections import defaultdict
 
 from sklearn.model_selection import train_test_split
 
-from domains import get_domain, DOMAIN_NAMES
+from ..domains import get_domain, DOMAIN_NAMES
 
 
 def parse_class(basename, class_names):
@@ -119,8 +119,12 @@ def split_dataset(domain):
     print(f"Generated splits: {n_train} train samples, {n_val} val samples, {n_test} test samples.")
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Phase 5: Train/val/test split")
     parser.add_argument("--domain", required=True, choices=DOMAIN_NAMES)
     args = parser.parse_args()
     split_dataset(get_domain(args.domain))
+
+
+if __name__ == "__main__":
+    main()

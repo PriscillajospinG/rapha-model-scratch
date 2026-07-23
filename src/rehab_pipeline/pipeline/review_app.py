@@ -6,8 +6,8 @@ happened to return it. A reviewer watches each candidate clip and either
 confirms the label, corrects it, or rejects the clip outright.
 
 Run locally (one domain per instance):
-    python review_app.py --domain lower_limb
-    python review_app.py --domain upper_body --port 5051
+    rehab-review --domain lower_limb
+    rehab-review --domain upper_body --port 5051
 Then open http://127.0.0.1:5050 (or the port you chose)
 
 Security note: this serves raw video files over local HTTP with no
@@ -25,7 +25,7 @@ from datetime import datetime
 
 from flask import Flask, request, redirect, url_for, send_from_directory, session, render_template_string
 
-from domains import get_domain, DOMAIN_NAMES
+from ..domains import get_domain, DOMAIN_NAMES
 
 REVIEW_LOG_FIELDS = ["filename", "query_class", "decision", "confirmed_class",
                       "accepted_filename", "reason", "reviewer", "reviewed_at"]
@@ -33,7 +33,7 @@ REVIEW_LOG_FIELDS = ["filename", "query_class", "decision", "confirmed_class",
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(16)  # local single-user tool, ephemeral is fine
 
-DOMAIN = None  # set in __main__ from --domain
+DOMAIN = None  # set from --domain
 BASE_DIR = PENDING_DIR = RAW_DIR = REVIEW_LOG = None
 
 
@@ -190,10 +190,14 @@ def submit():
     return redirect(url_for("index", class_filter=class_filter) if class_filter else url_for("index"))
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--domain", required=True, choices=DOMAIN_NAMES)
     parser.add_argument("--port", type=int, default=5050)
     args = parser.parse_args()
     configure(args.domain)
     app.run(host="127.0.0.1", port=args.port, debug=False)
+
+
+if __name__ == "__main__":
+    main()

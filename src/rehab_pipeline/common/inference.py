@@ -1,9 +1,9 @@
 """
-Shared inference logic used by both realtime_infer.py (continuous live
-webcam display, single domain) and stroke_assessment.py (one capture window
-per domain, combined into a multi-domain report). Keeping this in one place
-means both call paths apply the exact same preprocessing, calibration, and
-confidence gating.
+Shared inference logic used by both serve/realtime.py (continuous live
+webcam display, single domain) and serve/stroke_assessment.py (one capture
+window per domain, combined into a multi-domain report). Keeping this in
+one place means both call paths apply the exact same preprocessing,
+calibration, and confidence gating.
 """
 import os
 import json
@@ -12,14 +12,14 @@ from dataclasses import dataclass
 import numpy as np
 import onnxruntime as ort
 
-from pipeline_common import build_tensor
+from .preprocessing import build_tensor
 
 DEFAULT_POSE_MODEL_ASSET = "pose_landmarker_heavy.task"
 
 
 @dataclass
 class InferenceSession:
-    domain: object          # domains.base.DomainConfig
+    domain: object          # rehab_pipeline.domains.base.DomainConfig
     session: object         # onnxruntime.InferenceSession
     input_name: str
     classes: list
@@ -32,9 +32,9 @@ def load_session(domain, model_dir=None):
     meta_path = os.path.join(model_dir, "deployment_metadata.json")
     if not os.path.exists(meta_path):
         raise FileNotFoundError(
-            f"{meta_path} not found. Run `python phase_8_9_export.py --domain {domain.name}` "
-            f"first so calibration/threshold info is available -- running without it means "
-            f"unreliable raw softmax confidence."
+            f"{meta_path} not found. Run `rehab-export --domain {domain.name}` first so "
+            f"calibration/threshold info is available -- running without it means unreliable "
+            f"raw softmax confidence."
         )
     with open(meta_path) as f:
         meta = json.load(f)
