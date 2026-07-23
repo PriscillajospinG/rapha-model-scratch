@@ -395,3 +395,7 @@ def main():
     parser.add_argument("--domain", required=True, choices=DOMAIN_NAMES)
     args = parser.parse_args()
     train(get_domain(args.domain))
+
+
+if __name__ == "__main__":
+    main()

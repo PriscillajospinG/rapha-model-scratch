@@ -9,12 +9,12 @@ in sequence and combines them into one report.
 The face domain is intentionally not included yet -- see README.md's
 "Known limitations" for why (facial droop assessment needs a different
 model, MediaPipe FaceLandmarker + a symmetry score, not the same CTR-GCN
-classifier pattern as the limb domains). Add it to AVAILABLE_DOMAINS in
-this file once domains/face.py exists.
+classifier pattern as the limb domains). Add it to the domain registry
+(domains/face.py + domains/__init__.py) once it exists.
 
 Usage:
-    python stroke_assessment.py --domains upper_body lower_limb
-    python stroke_assessment.py --domains upper_body lower_limb face  # face reported as unavailable
+    rehab-stroke-assessment --domains upper_body lower_limb
+    rehab-stroke-assessment --domains upper_body lower_limb face  # face reported as unavailable
 
 This produces a screening report, not a diagnosis. See the disclaimer field
 in its own output.
@@ -23,9 +23,9 @@ import argparse
 import json
 from datetime import datetime
 
-from domains import DOMAIN_NAMES
-from realtime_infer import run as run_realtime_once
-from inference_common import DEFAULT_POSE_MODEL_ASSET
+from ..domains import DOMAIN_NAMES
+from .realtime import run as run_realtime_once
+from ..common.inference import DEFAULT_POSE_MODEL_ASSET
 
 DISCLAIMER = (
     "This is an automated screening report generated from short webcam captures "
@@ -81,7 +81,7 @@ def run_assessment(domains, source="0", window_seconds=6.0, pose_model=DEFAULT_P
     return report
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--domains", nargs="+", default=["upper_body", "lower_limb"],
                          choices=DOMAIN_NAMES + ["face"])
@@ -101,3 +101,7 @@ if __name__ == "__main__":
         with open(args.output, "w") as f:
             json.dump(report, f, indent=2)
         print(f"Saved to {args.output}")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,9 +1,11 @@
-# Skeleton-Based Rehab Exercise Classification Pipeline
+# rehab-pipeline
 
-Collects exercise-demonstration video, extracts skeleton keypoints, and
-trains a CTR-GCN model to classify rehab exercises for a given body region
-("domain"), with a real-time inference path and a multi-domain stroke
-assessment orchestrator on top.
+Skeleton-based rehab exercise classification: collects exercise-demonstration
+video, extracts skeleton keypoints, and trains a CTR-GCN model to classify
+rehab exercises for a given body region ("domain"), with a real-time
+inference path and a multi-domain stroke-assessment orchestrator on top.
+Packaged as an installable Python package (`rehab_pipeline`) with a set of
+`rehab-*` console commands, one per pipeline stage.
 
 **Read [Known limitations](#known-limitations-read-before-clinical-use) before
 treating any model trained here as patient-ready.** This pipeline fixes the
@@ -20,64 +22,99 @@ likely, regulatory input.
 | `lower_limb` | Implemented | ankle, calf, hamstring, heel_slide, hip, knee, leg_raise, quadriceps, toes |
 | `upper_body` | Implemented | shoulder_flexion, shoulder_abduction, elbow_flexion, wrist_curl, pronation_supination, arm_raise, external_rotation, bicep_curl, tricep_extension |
 | `face` | **Not built** | Facial droop/symmetry assessment needs a different model (MediaPipe FaceLandmarker + a symmetry score, not this repo's CTR-GCN classifier) -- see [Known limitations](#known-limitations-read-before-clinical-use) |
-| `stroke_rehab` | Orchestration layer, not a domain | `stroke_assessment.py` runs `upper_body` + `lower_limb` (and `face` once it exists) in sequence and combines them into one report -- stroke assessment isn't its own body region |
+| `stroke_rehab` | Orchestration layer, not a domain | `rehab-stroke-assessment` runs `upper_body` + `lower_limb` (and `face` once it exists) in sequence and combines them into one report -- stroke assessment isn't its own body region |
 
 Both implemented domains' exercise lists are a starting point, not a
 clinician-validated taxonomy -- see Known limitations.
 
-## Repo layout
+## Architecture
 
 ```
-domains/                  Per-domain config: classes, search queries, joint indices,
-                           skeleton graph, normalization reference (see domains/base.py)
-  lower_limb.py
-  upper_body.py
+pyproject.toml              Package metadata, dependencies, rehab-* console script entry points
+requirements.txt            Fallback for plain `pip install -r` (pyproject.toml is primary)
 
-pipeline_common.py         Shared preprocessing (interpolation, normalization, tensor
-                           building) -- takes a domain config, used by every stage
-quality_filter.py          Automated YOLO triage before a human ever reviews a clip
-crypto_utils.py             At-rest encryption for skeleton tensors
-inference_common.py         Shared model-loading + classification logic for realtime_infer.py
-                           and stroke_assessment.py (keeps their preprocessing identical)
+src/rehab_pipeline/
+├── domains/                 Per-domain config: classes, search queries, joint indices,
+│   │                        skeleton graph, normalization reference
+│   ├── base.py               DomainConfig dataclass + shape/consistency checks
+│   ├── lower_limb.py
+│   └── upper_body.py
+│
+├── common/                  Shared logic used by every stage -- this is what makes
+│   │                        the pipeline domain-agnostic instead of copy-pasted per domain
+│   ├── preprocessing.py      Interpolation, center/scale normalization, tensor building
+│   ├── crypto.py              At-rest encryption for skeleton tensors (Fernet)
+│   ├── quality_filter.py     Automated YOLO triage before a human ever reviews a clip
+│   └── inference.py           Model loading + classification, shared by realtime + stroke assessment
+│
+├── pipeline/                 The linear per-domain pipeline, one module per stage
+│   ├── collect.py             Stage 1: download candidates -> pending_review/      [rehab-collect]
+│   ├── review_app.py          Stage 2: human labeling UI -> raw/ (confirmed only)  [rehab-review]
+│   ├── extract.py             Stage 3: skeleton extraction -> encrypted skeletons/ [rehab-extract]
+│   ├── augment.py             Optional: fills classes via flip/brightness aug      [rehab-augment]
+│   ├── split.py                Stage 4: subject-grouped train/val/test split        [rehab-split]
+│   ├── train.py                Stage 5: train CTR-GCN + calibrate confidence         [rehab-train]
+│   └── export.py               Stage 6: export ONNX + deployment metadata            [rehab-export]
+│
+├── serve/                    Runtime inference, built on common/inference.py
+│   ├── realtime.py            Stage 7: live webcam inference, single domain    [rehab-realtime]
+│   └── stroke_assessment.py   Multi-domain orchestrator ("stroke_rehab")       [rehab-stroke-assessment]
+│
+├── maintenance/
+│   └── purge_rejected.py     Retention utility for unreviewed clips            [rehab-purge]
+│
+└── run_pipeline.py           Convenience runner for stages 1/3/4 of one domain [rehab-run-pipeline]
 
-phase_1_2_collect.py       Stage 1: download candidates -> pending_review/
-review_app.py               Stage 2: human labeling UI -> raw/ (confirmed only)
-phase_3_4_extract.py       Stage 3: skeleton extraction -> encrypted skeletons/
-augment_fill.py             Optional: fills classes up to target via flip/brightness augmentation
-phase_5_split.py           Stage 4: subject-grouped train/val/test split
-phase_6_7_train.py         Stage 5: train CTR-GCN + calibrate confidence
-phase_8_9_export.py        Stage 6: export ONNX + deployment metadata
-realtime_infer.py           Stage 7: live webcam inference, single domain
-stroke_assessment.py        Multi-domain orchestrator (the "stroke_rehab" use case)
-
-purge_rejected.py           Retention utility for unreviewed clips
-run_pipeline.py             Convenience runner for stages 1, 3, 4 of one domain
+datasets/<domain>/            Data, not code -- pending_review/, raw/, skeletons/, *.csv, *.json
+models/<domain>/               best_model.pth, best_model.onnx, deployment_metadata.json
+evaluation/<domain>/           metrics.json, confusion_matrix.png/.json, calibration.json
 ```
+
+Each pipeline/serve/maintenance module exposes both a `main()` (used by its
+console script) and its underlying function (`download_and_process`,
+`process_dataset`, `split_dataset`, etc.) so other code -- like
+`run_pipeline.py` or `stroke_assessment.py` calling `serve/realtime.py`'s
+`run()` directly -- can call it in-process instead of shelling out.
 
 Nothing else should be in this repo -- earlier one-off patch scripts tied to
 a since-replaced data schema (`fix_metadata.py`, `repair_metadata.py`,
 `force_fill.py`, `cleanup_skeletons.py`, `audit_pipeline.py`,
 `collect_dataset.py`, `clean_dataset.py`, `test_mp.py`) have been removed;
 anything useful in them (3-frame duplicate hashing, the YOLO visibility
-heuristic) was folded into the scripts above.
+heuristic) was folded into the modules above.
 
 ## Environment Setup
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121  # or CPU wheel
-pip install -r requirements.txt
+
+# GPU (CUDA) users only -- install this BEFORE the editable install below,
+# so pip doesn't pull a CPU-only torch wheel from PyPI instead:
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Installs the package + registers every rehab-* command on your PATH
+pip install -e .
 
 # MediaPipe pose model asset (not committed to git -- it's a downloadable
-# third-party asset, not project source):
+# third-party asset, not project source). Run from the repo root:
 curl -L -o pose_landmarker_heavy.task \
   https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task
 # If that URL has moved, get the current one from
 # https://ai.google.dev/edge/mediapipe/solutions/vision/pose_landmarker
 
-python crypto_utils.py init   # generates .keys/skeleton.key -- back this up, never commit it
+rehab-keygen   # generates .keys/skeleton.key -- back this up, never commit it
 ```
+
+`pip install -e .` is the recommended path (it gives you the `rehab-*`
+commands used throughout this README). If you'd rather not install the
+package, every command below also works as `python -m rehab_pipeline.<module>`
+run from the repo root, e.g. `python -m rehab_pipeline.pipeline.collect
+--domain lower_limb --target 50`.
+
+**All commands assume you're running from the repository root** -- paths
+like `datasets/<domain>/` and `pose_landmarker_heavy.task` are resolved
+relative to the current directory, not installed into site-packages.
 
 ## Running the pipeline (per domain)
 
@@ -86,13 +123,13 @@ whole sequence once per domain you're building.
 
 ### 1-2. Collect + review
 ```bash
-python phase_1_2_collect.py --domain lower_limb --target 50   # -> pending_review/
-python review_app.py --domain lower_limb                      # http://127.0.0.1:5050
+rehab-collect --domain lower_limb --target 50   # -> pending_review/
+rehab-review --domain lower_limb                # http://127.0.0.1:5050
 ```
 To review two domains at once, give the second instance its own port:
-`python review_app.py --domain upper_body --port 5051`.
+`rehab-review --domain upper_body --port 5051`.
 
-`review_app.py` serves raw video over local HTTP with no auth -- run it on
+`rehab-review` serves raw video over local HTTP with no auth -- run it on
 localhost only, never expose the port. Rejected clips are deleted
 immediately; nothing rejected is retained. Confirmed clips move to `raw/`
 with a full audit trail in `datasets/<domain>/review_log.csv` (reviewer,
@@ -100,7 +137,7 @@ timestamp, original query-based guess vs. confirmed label).
 
 ### 3. Extract skeletons
 ```bash
-python phase_3_4_extract.py --domain lower_limb
+rehab-extract --domain lower_limb
 ```
 Only reads from `raw/` (i.e. only human-confirmed videos). Normalizes each
 skeleton per the domain's config (e.g. hip-centered/hip-width-scaled for
@@ -113,23 +150,23 @@ joints are dropped rather than silently trained on (see
 
 ### (Optional) Fill classes via augmentation
 ```bash
-python augment_fill.py --domain lower_limb --target 50
+rehab-augment --domain lower_limb --target 50
 ```
 Generates flip/brightness variants to top up under-represented classes.
 Run this *before* extraction (step 3) so augmented clips get skeletons too.
-`phase_5_split.py` groups every augmented clip with its source video so
-these never leak across train/val/test.
+`rehab-split` groups every augmented clip with its source video so these
+never leak across train/val/test.
 
 ### 4. Split
 ```bash
-python phase_5_split.py --domain lower_limb
+rehab-split --domain lower_limb
 ```
 Produces `train_labels.csv` / `val_labels.csv` / `test_labels.csv` (70/15/15),
 grouped by source video.
 
 ### 5. Train
 ```bash
-python phase_6_7_train.py --domain lower_limb
+rehab-train --domain lower_limb
 ```
 Uses the validation set (not the test set) for early stopping and
 checkpoint selection. After training, fits a calibration temperature and a
@@ -139,15 +176,15 @@ test set exactly once. Outputs land in `evaluation/<domain>/`: `metrics.json`,
 
 ### 6. Export
 ```bash
-python phase_8_9_export.py --domain lower_limb
+rehab-export --domain lower_limb
 ```
 Exports `models/<domain>/best_model.onnx` + `deployment_metadata.json`,
 which includes the calibration temperature and confidence threshold
-`realtime_infer.py` needs.
+`rehab-realtime` needs.
 
 ### 7. Real-time deployment (single domain)
 ```bash
-python realtime_infer.py --domain lower_limb --source 0 --window-seconds 6
+rehab-realtime --domain lower_limb --source 0 --window-seconds 6
 ```
 Live webcam inference: extracts skeletons per frame, keeps a sliding window,
 resamples/normalizes it identically to training, runs ONNX inference every
@@ -161,49 +198,58 @@ accuracy loss no amount of model tuning fixes.
 
 ### 8. Combined stroke-rehab assessment (multi-domain)
 ```bash
-python stroke_assessment.py --domains upper_body lower_limb
+rehab-stroke-assessment --domains upper_body lower_limb
 ```
 Prompts you to perform each domain's movement in turn, captures one window
-per domain via the same logic as `realtime_infer.py`, and prints/saves a
+per domain via the same logic as `rehab-realtime`, and prints/saves a
 combined JSON report. This is the "stroke_rehab" use case: an orchestration
 layer over the per-domain models, not a separate model or class list. It
 carries an explicit disclaimer in its own output -- it's a screening report,
-not a diagnosis. Add `face` to `--domains` once `domains/face.py` exists;
+not a diagnosis. Add `face` to `--domains` once a `face` domain exists;
 until then it's reported as `not_available`.
+
+### Convenience: stages 1/3/4 in one command
+```bash
+rehab-run-pipeline --domain lower_limb --target 50
+```
+Runs collect, then stops and tells you to run `rehab-review` if there's
+anything pending, then (once the queue is empty) runs extract + split.
+Training/export are deliberately separate commands -- they're typically run
+on a GPU machine.
 
 ## Adding a new domain
 
-1. Create `domains/<name>.py` following `domains/upper_body.py` as a
-   template: `CLASSES`, `QUERIES` (search phrases per class), MediaPipe
+1. Create `src/rehab_pipeline/domains/<name>.py` following `upper_body.py` as
+   a template: `CLASSES`, `QUERIES` (search phrases per class), MediaPipe
    joint indices + names, `center_joints`/`scale_joints` (pick a pair that
    stays roughly rigid across the domain's movements -- never the pair
    whose distance IS the motion being classified), `graph_edges` (skeleton
    connectivity), `yolo_pose_keypoint_range` (COCO keypoint slice for the
    collection-time visibility triage).
-2. Register it in `domains/__init__.py`.
+2. Register it in `src/rehab_pipeline/domains/__init__.py`.
 3. Everything else (collection, review, extraction, split, train, export,
    realtime inference) works automatically via `--domain <name>` -- none of
-   those scripts have per-domain logic in them anymore.
+   those modules have per-domain logic in them anymore.
 4. **Face is the one domain that won't fit this pattern.** It needs
    MediaPipe FaceLandmarker (468 points, not Pose's 33) and, if the goal is
    droop/symmetry assessment, a fundamentally different output (a symmetry
    score/regression) rather than a 9-way softmax classifier. Don't force it
-   through the `DomainConfig` shape above without rethinking `pipeline_common.py`'s
-   classification-specific assumptions first.
+   through the `DomainConfig` shape above without rethinking
+   `common/preprocessing.py`'s classification-specific assumptions first.
 
 ## Data handling / privacy posture
 
 - **Raw video is never retained** past the review step (rejected) or the
   extraction step (accepted). Only the derived skeleton keypoint tensor is
-  kept, and it's encrypted at rest (`crypto_utils.py`, Fernet).
+  kept, and it's encrypted at rest (`common/crypto.py`, Fernet).
 - The encryption key (`.keys/skeleton.key`) is dev-grade key management: a
   local file, gitignored. **Before handling real patient data in
   production, replace this with a real KMS** (AWS/GCP/Azure) and key
-  rotation -- this script deliberately does not pretend otherwise.
+  rotation -- this deliberately does not pretend otherwise.
 - Every accepted training label has a human review record
   (`datasets/<domain>/review_log.csv`).
-- `purge_rejected.py --domain <name>` cleans up unreviewed clips that sat in
-  the queue past a retention window (default 30 days, dry-run by default).
+- `rehab-purge --domain <name>` cleans up unreviewed clips that sat in the
+  queue past a retention window (default 30 days, dry-run by default).
 - Committing encrypted skeleton tensors to a shared/public git repo is a
   privacy decision, not just an engineering one -- they're inert without the
   key, but they are still derived from real people. Decide deliberately
@@ -232,10 +278,10 @@ until then it's reported as `not_available`.
   different model type than the classifier used for the limb domains --
   don't bolt it onto the existing `DomainConfig` pattern without rethinking
   that.
-- `stroke_assessment.py` is a thin sequencing layer, not a validated
+- `rehab-stroke-assessment` is a thin sequencing layer, not a validated
   composite stroke score. It reports each domain's independent result; it
   does not combine them into any kind of clinical severity scale.
-- Labels are human-confirmed, but by whoever runs `review_app.py` -- they
+- Labels are human-confirmed, but by whoever runs `rehab-review` -- they
   are not clinician-verified unless you have a clinician doing the
   reviewing.
 - The confidence-gating threshold and calibration are fit on a validation

@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rehab-pipeline"
+version = "0.1.0"
+description = "Skeleton-based rehab exercise classification: collection, human review, training, and real-time inference across multiple body-region domains."
+requires-python = ">=3.9"
+readme = "README.md"
+dependencies = [
+    "yt-dlp",
+    "opencv-python<4.10",
+    "opencv-contrib-python<4.10",
+    "ultralytics",
+    "imagehash",
+    "pandas",
+    "numpy<2",
+    "Pillow",
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "mediapipe",
+    "scikit-learn",
+    "matplotlib",
+    "onnx",
+    "onnxruntime",
+    "scipy",
+    "flask",
+    "cryptography",
+]
+
+# GPU (CUDA) users: install torch/torchvision/torchaudio from the CUDA wheel
+# index BEFORE `pip install -e .` -- see README.md Environment Setup. This
+# dependency list intentionally doesn't pin an index url so it works on both
+# CPU-only and pre-configured CUDA environments.
+
+[project.scripts]
+rehab-collect = "rehab_pipeline.pipeline.collect:main"
+rehab-review = "rehab_pipeline.pipeline.review_app:main"
+rehab-augment = "rehab_pipeline.pipeline.augment:main"
+rehab-extract = "rehab_pipeline.pipeline.extract:main"
+rehab-split = "rehab_pipeline.pipeline.split:main"
+rehab-train = "rehab_pipeline.pipeline.train:main"
+rehab-export = "rehab_pipeline.pipeline.export:main"
+rehab-realtime = "rehab_pipeline.serve.realtime:main"
+rehab-stroke-assessment = "rehab_pipeline.serve.stroke_assessment:main"
+rehab-purge = "rehab_pipeline.maintenance.purge_rejected:main"
+rehab-run-pipeline = "rehab_pipeline.run_pipeline:main"
+rehab-keygen = "rehab_pipeline.common.crypto:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

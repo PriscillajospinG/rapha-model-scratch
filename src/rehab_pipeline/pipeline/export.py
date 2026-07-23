@@ -1,11 +1,11 @@
 """
 Phase 8 & 9: Export best trained CTR-GCN model to ONNX + deployment metadata
 (including calibration temperature + the confidence threshold below which
-realtime_infer.py should report "uncertain" instead of forcing a class).
+serve/realtime.py should report "uncertain" instead of forcing a class).
 
 Usage:
-    python phase_8_9_export.py --domain lower_limb
-    python phase_8_9_export.py --domain upper_body
+    rehab-export --domain lower_limb
+    rehab-export --domain upper_body
 """
 import os
 import json
@@ -14,8 +14,8 @@ import hashlib
 import subprocess
 import torch
 
-from domains import get_domain, DOMAIN_NAMES
-from phase_6_7_train import build_model
+from ..domains import get_domain, DOMAIN_NAMES
+from .train import build_model
 
 
 def _file_hash(path):
@@ -47,7 +47,7 @@ def export_and_report(domain):
     model_path = os.path.join(model_dir, "best_model.pth")
     if not os.path.exists(model_path):
         print(f"Error: {model_path} not found. Train the model first "
-              f"(python phase_6_7_train.py --domain {domain.name}).")
+              f"(rehab-train --domain {domain.name}).")
         return
 
     device = torch.device("cpu")
@@ -133,7 +133,7 @@ def export_and_report(domain):
                          "2": "z (center-joint normalized, scale normalized)",
                          "3": "visibility"},
             "note": "Inputs MUST be normalized identically to training: see "
-                    "pipeline_common.normalize_skeleton with this domain's center_joints/"
+                    "common.preprocessing.normalize_skeleton with this domain's center_joints/"
                     "scale_joints. Do not feed raw MediaPipe coordinates directly.",
         },
         "output": {
@@ -142,16 +142,16 @@ def export_and_report(domain):
             "note": "Divide logits by 'calibration.temperature' before softmax to get "
                     "calibrated probabilities. Treat max probability below "
                     "'calibration.recommended_confidence_threshold' as 'uncertain', not as "
-                    "the argmax class -- see realtime_infer.py.",
+                    "the argmax class -- see serve/realtime.py.",
         },
         "calibration": calibration,
         "joint_mapping": {str(i): name for i, name in enumerate(domain.joint_names)},
         "preprocessing": f"MediaPipe PoseLandmarker (heavy model) -> {domain.num_joints} "
                           f"{domain.name} joints -> interpolate to {domain.target_frames} frames "
-                          f"-> center/scale normalize (pipeline_common.build_tensor)",
+                          f"-> center/scale normalize (common.preprocessing.build_tensor)",
         "data_handling": "Only encrypted skeleton tensors are retained; source video is "
                           "deleted after extraction. Every training label was confirmed by a "
-                          "human reviewer via review_app.py (see review_log.csv) rather than "
+                          "human reviewer via rehab-review (see review_log.csv) rather than "
                           "trusted from collection-time search queries.",
         "domain_notes": domain.notes,
         "performance": metrics,
@@ -183,7 +183,7 @@ def export_and_report(domain):
 | Test  | {num_test} |
 | Total | {num_train + num_val + num_test} |
 
-Labels were human-confirmed via review_app.py (see datasets/{domain.name}/review_log.csv),
+Labels were human-confirmed via rehab-review (see datasets/{domain.name}/review_log.csv),
 not trusted from the YouTube search query used to find each video.
 Splits are grouped by source video, so augmented (flip/brightness) clips never
 leak across train/val/test.
@@ -225,7 +225,7 @@ full accuracy-vs-coverage sweep this was chosen from.
    as thin in dataset_report.json.
 2. **Check confusion_matrix.png** to see which specific movement pairs the model
    confuses -- that tells you where to prioritize new data collection.
-3. **Re-run collection + review_app.py** for underrepresented classes.
+3. **Re-run collection + rehab-review** for underrepresented classes.
 4. **Tune hyperparameters** -- try lr=0.0005, deeper model, or a two-stream
    (joint + velocity) variant, which is standard for skeleton action recognition.
 5. This dataset is still YouTube-demo footage. If the deployment population is
@@ -241,8 +241,12 @@ full accuracy-vs-coverage sweep this was chosen from.
     print(f"\n=== Phase 8 & 9 Complete ({domain.name}) ===")
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Phase 8 & 9: Export + report")
     parser.add_argument("--domain", required=True, choices=DOMAIN_NAMES)
     args = parser.parse_args()
     export_and_report(get_domain(args.domain))
+
+
+if __name__ == "__main__":
+    main()

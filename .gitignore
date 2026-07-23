@@ -3,6 +3,13 @@
 __pycache__/
 *.pyc
 
+# Python packaging artifacts
+*.egg-info/
+build/
+dist/
+venv/
+.venv/
+
 # Pretrained third-party model weights (downloadable, not project source)
 yolov8n.pt
 yolov8n-pose.pt
@@ -17,20 +24,21 @@ models/
 evaluation/
 
 # Raw video is never retained by design past review/extraction.
-# It should never end up in git history.
+# It should never end up in git history. Applies to every domain under
+# datasets/<domain>/.
 *.mp4
 temp_*
-datasets/lower_limb/raw/
-datasets/lower_limb/pending_review/
-datasets/lower_limb/rejected/
-datasets/lower_limb/manual_review/
+datasets/*/raw/
+datasets/*/pending_review/
+datasets/*/rejected/
+datasets/*/manual_review/
 
 # Encryption key for skeleton tensors -- NEVER commit this
 .keys/
 
-# Optional local capture output from realtime_infer.py --capture-dir
+# Optional local capture output from `rehab-realtime --capture-dir`
 captures/
 
-# Do track: datasets/lower_limb/skeletons/*.npy.enc, *.csv, review_log.csv,
+# Do track: datasets/<domain>/skeletons/*.npy.enc, *.csv, review_log.csv,
 # metadata.csv, and *.json reports -- these are the sanitized, encrypted,
 # human-reviewed artifacts this pipeline is built to produce.

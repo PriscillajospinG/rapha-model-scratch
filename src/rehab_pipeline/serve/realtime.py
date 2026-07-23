@@ -2,8 +2,8 @@
 Real-time exercise classification from a live camera feed, for one domain.
 
 Usage:
-    python realtime_infer.py --domain lower_limb --source 0 --window-seconds 6
-    python realtime_infer.py --domain upper_body --once   # single capture, print result, exit
+    rehab-realtime --domain lower_limb --source 0 --window-seconds 6
+    rehab-realtime --domain upper_body --once   # single capture, print result, exit
 
 Design:
   - Pose is extracted per-frame with MediaPipe in IMAGE mode (the codebase's
@@ -16,10 +16,10 @@ Design:
     a mismatched window length is a real source of train/serve skew that
     nothing in this script can detect for you).
   - Every `--interval` seconds (continuous mode), or once (--once, used by
-    stroke_assessment.py), the buffer is classified via inference_common,
-    which applies the exact preprocessing and calibrated confidence gating
-    used at training/export time. Predictions below threshold are reported
-    as "uncertain" rather than forced to a class.
+    serve/stroke_assessment.py), the buffer is classified via
+    common/inference.py, which applies the exact preprocessing and
+    calibrated confidence gating used at training/export time. Predictions
+    below threshold are reported as "uncertain" rather than forced to a class.
   - Nothing is written to disk by default. Raw video frames live only in
     memory for the duration of the sliding window. Pass --capture-dir to
     opt in to saving encrypted skeleton windows (NOT video) for future
@@ -36,8 +36,8 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
-from domains import get_domain, DOMAIN_NAMES
-from inference_common import load_session, extract_frame_joints, classify_window, DEFAULT_POSE_MODEL_ASSET
+from ..domains import get_domain, DOMAIN_NAMES
+from ..common.inference import load_session, extract_frame_joints, classify_window, DEFAULT_POSE_MODEL_ASSET
 
 
 def run(args):
@@ -65,7 +65,7 @@ def run(args):
 
     if args.capture_dir:
         os.makedirs(args.capture_dir, exist_ok=True)
-        from crypto_utils import save_encrypted_npy
+        from ..common.crypto import save_encrypted_npy
         print(f"Consented capture mode ON -- saving encrypted skeleton windows to {args.capture_dir}")
 
     if not args.display:
@@ -106,7 +106,7 @@ def run(args):
 
                 if args.capture_dir:
                     import numpy as np
-                    from pipeline_common import build_tensor
+                    from ..common.preprocessing import build_tensor
                     tensor, _ = build_tensor(np.asarray(frames_only), domain)
                     fname = os.path.join(args.capture_dir, f"{domain.name}_{uuid.uuid4().hex}.npy.enc")
                     save_encrypted_npy(tensor, fname)
@@ -132,7 +132,7 @@ def run(args):
     return last_label, last_conf
 
 
-if __name__ == "__main__":
+def build_arg_parser():
     parser = argparse.ArgumentParser(description="Real-time exercise classification")
     parser.add_argument("--domain", required=True, choices=DOMAIN_NAMES)
     parser.add_argument("--source", default="0", help="Camera index or video path/stream URL")
@@ -151,11 +151,19 @@ if __name__ == "__main__":
                          help="Run headless (print to console instead of opening a window)")
     parser.add_argument("--once", action="store_true",
                          help="Capture one window, classify once, print result, and exit "
-                              "(used by stroke_assessment.py)")
+                              "(used by rehab-stroke-assessment)")
     parser.add_argument("--capture-dir", default=None,
                          help="If set, save encrypted skeleton windows here for future retraining. "
                               "Only use with the subject's informed consent.")
-    args = parser.parse_args()
+    return parser
+
+
+def main():
+    args = build_arg_parser().parse_args()
     if args.once:
         args.display = False
     run(args)
+
+
+if __name__ == "__main__":
+    main()
